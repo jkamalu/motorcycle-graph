@@ -1,6 +1,8 @@
 #ifndef MOTORCYCLE_H
 #define MOTORCYCLE_H
 
+#include <motorcycleconstants.h>
+
 #include <boost/functional/hash.hpp>
 #include <boost/core/noncopyable.hpp>
 
@@ -12,9 +14,7 @@ class Motorcycle : boost::noncopyable {
 
 private:
 
-    typedef PolyMesh_ArrayKernelT<> MyMesh;
-
-    MyMesh polymesh;
+    MotorcycleConstants::MyMesh polymesh;
     std::vector<int> trace;
     mutable HalfedgeHandle handle;
 
@@ -22,7 +22,7 @@ public:
 
     const int origin;
 
-    Motorcycle(MyMesh& polymesh, HalfedgeHandle& current);
+    Motorcycle(MotorcycleConstants::MyMesh& polymesh, HalfedgeHandle& current);
     HalfedgeHandle curr();
     HalfedgeHandle next();
     HalfedgeHandle step();

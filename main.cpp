@@ -1,7 +1,10 @@
-#include <iostream>
-#include <OpenMesh/Core/IO/MeshIO.hh>
+#include <motorcycleconstants.h>
 #include <motorcycle.h>
 #include <motorcyclegraph.h>
+
+#include <iostream>
+
+#include <OpenMesh/Core/IO/MeshIO.hh>
 
 using namespace std;
 
@@ -11,7 +14,7 @@ int main(int argc, char *argv[]) {
 
     string filename = argv[1];
     
-    PolyMesh_ArrayKernelT<> polymesh;
+    MotorcycleConstants::MyMesh polymesh;
 
     try {
         if (!OpenMesh::IO::read_mesh(polymesh, filename)) {
@@ -25,6 +28,7 @@ int main(int argc, char *argv[]) {
     }
 
     MotorcycleGraph motorcycleGraph(polymesh);
+    motorcycleGraph.save_mesh();
 
     return 0;
 }

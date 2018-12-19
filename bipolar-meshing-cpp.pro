@@ -30,7 +30,8 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 
 HEADERS += \
     motorcycle.h \
-    motorcyclegraph.h
+    motorcyclegraph.h \
+    motorcycleconstants.h
 
 SOURCES += \
     main.cpp \

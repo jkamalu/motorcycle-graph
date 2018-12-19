@@ -1,6 +1,6 @@
 #include "motorcycle.h"
 
-Motorcycle::Motorcycle(MyMesh& polymesh, HalfedgeHandle& handle)
+Motorcycle::Motorcycle(MotorcycleConstants::MyMesh& polymesh, HalfedgeHandle& handle)
     : polymesh(polymesh),  trace(), handle(handle), origin(handle.idx()){
     this->trace.push_back(this->origin);
 }
