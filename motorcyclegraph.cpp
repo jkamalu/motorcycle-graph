@@ -6,9 +6,11 @@ MotorcycleGraph::MotorcycleGraph(MyMesh& polymesh) :
     V("V"),
     M("M"),
     E("E"),
+    F("F"),
     v_manager(polymesh, this->V),
     m_manager(polymesh, this->M),
     e_manager(polymesh, this->E),
+    f_manager(polymesh, this->F),
     polymesh(polymesh) {
 
     Motorcycles motorcycles;
@@ -48,6 +50,8 @@ MotorcycleGraph::MotorcycleGraph(MyMesh& polymesh) :
     std::vector<Perimeter> perimeters = this->extract_perimeters();
 
     std::cout << "Extracted " << perimeters.size() << " perimeters." << std::endl;
+
+    this->assign_patches(perimeters);
 
 }
 
@@ -184,4 +188,64 @@ std::vector<MotorcycleGraph::Perimeter> MotorcycleGraph::extract_perimeters() {
 
     return perimeters;
 
+}
+
+void MotorcycleGraph::assign_patches(std::vector<Perimeter> &perimeters) {
+    size_t patch_id = 0;
+    for (const Perimeter& perimeter : perimeters) {
+        std::vector<int> to_explore;
+        size_t j = 0;
+        for (const std::pair<int, std::vector<int> >& p : perimeter) {
+            std::vector<int> halfedges = p.second;
+            int v_next;
+            try {
+                v_next = perimeter[j + 1].first;
+            } catch (std::out_of_range) {
+                v_next = perimeter[0].first;
+            }
+            for (const int& h : halfedges) {
+                HalfedgeHandle h_handle = this->polymesh.halfedge_handle(h);
+                if (this->polymesh.to_vertex_handle(h_handle).idx() != v_next) {
+                    to_explore.push_back(h);
+                }
+            }
+        }
+
+        std::unordered_set<int> boundary;
+        for (const std::pair<int, std::vector<int> >& p : perimeter) {
+            boundary.insert(p.first);
+        }
+
+        std::queue<int> queue;
+        for (const int& h : to_explore) {
+            HalfedgeHandle h_handle = this->polymesh.halfedge_handle(h);
+            queue.push(this->polymesh.to_vertex_handle(h_handle).idx());
+        }
+
+        std::unordered_set<int> v_seen;
+        while (!queue.empty()) {
+            VertexHandle v_curr = this->polymesh.vertex_handle(queue.front());
+            queue.pop();
+            if (v_seen.count(v_curr.idx()) == 0 && boundary.count(v_curr.idx()) == 0) {
+                v_seen.insert(v_curr.idx());
+                MyMesh::VertexOHalfedgeCWIter iter = this->polymesh.voh_cwbegin(v_curr);
+                while  (iter != this->polymesh.voh_cwend(v_curr)) {
+                    VertexHandle v_next = this->polymesh.to_vertex_handle(*iter);
+                    bool on_boundary = boundary.count(v_next.idx()) == 1;
+                    if (!on_boundary) {
+                        FaceHandle f_handle = this->polymesh.face_handle(*iter);
+                        if (f_handle.is_valid()) {
+                            this->f_manager[f_handle] = patch_id;
+                        }
+                        // TODO: this if *should* be unnecessary
+                        if (v_seen.count(v_next.idx()) == 0) {
+                            v_seen.insert(v_next.idx());
+                        }
+                    }
+                    ++iter;
+                }
+            }
+        }
+        patch_id++;
+    }
 }

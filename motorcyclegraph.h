@@ -4,6 +4,7 @@
 #include <motorcycle.h>
 
 #include <iostream>
+#include <queue>
 #include <unordered_set>
 #include <unordered_map>
 
@@ -22,19 +23,22 @@ private:
     typedef std::unordered_map<int, std::unique_ptr<Motorcycle> > Motorcycles;
     typedef std::vector<std::pair<int, std::vector<int> > > Perimeter;
 
-    const char V[2];// = "V";
-    const char M[2];// = "M";
-    const char E[2];// = "E";
+    const char V[2];
+    const char M[2];
+    const char E[2];
+    const char F[2];
 
     PropertyManager<VPropHandleT<bool>, MyMesh> v_manager;
     PropertyManager<VPropHandleT<bool>, MyMesh> m_manager;
     PropertyManager<EPropHandleT<bool>, MyMesh> e_manager;
+    PropertyManager<FPropHandleT<size_t>, MyMesh> f_manager;
 
     MyMesh polymesh;
 
     bool is_ordinary(VertexHandle v);
     void propagate_motorcycles(Motorcycles& motorcycles);
     std::vector<Perimeter> extract_perimeters();
+    void assign_patches(std::vector<Perimeter>& perimeters);
 
 public:
     MotorcycleGraph(MyMesh& polymesh);
