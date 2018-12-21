@@ -20,6 +20,10 @@ MotorcycleGraph::MotorcycleGraph(MotorcycleConstants::MyMesh& polymesh) :
         this->e_manager[*e_iter] = this->polymesh.is_boundary(*e_iter);
     }
 
+    for (MotorcycleConstants::MyMesh::FaceIter f_iter = this->polymesh.faces_begin(); f_iter != this->polymesh.faces_end(); ++f_iter) {
+        this->f_manager[*f_iter] = SIZE_T_MAX;
+    }
+
     Motorcycles motorcycles;
     int motorcycle_count = 0;
     for (MotorcycleConstants::MyMesh::VertexIter v_iter = this->polymesh.vertices_begin(); v_iter != this->polymesh.vertices_end(); ++v_iter) {
@@ -44,14 +48,30 @@ MotorcycleGraph::MotorcycleGraph(MotorcycleConstants::MyMesh& polymesh) :
     std::cout << "# Extraordinary = " << motorcycle_count << std::endl;
     std::cout << "# Vertices = " << this->polymesh.n_vertices() << std::endl;
     std::cout << "# Faces = " << this->polymesh.n_faces() << std::endl;
-
-    std::cout << "Initialized " << motorcycles.size() << " motorcycles." << std::endl;
+    std::cout << "# Edges = " << this->polymesh.n_edges() << std::endl;
+    std::cout << std::endl;
 
     this->propagate_motorcycles(motorcycles);
+    int n_vertices = 0;
+    for (const auto& v : this->polymesh.vertices()) {
+        if (this->v_manager[v]) {
+            n_vertices++;
+        }
+    }
+    std::cout << "Motorcycle graph contains " << n_vertices << " vertices after propagation." << std::endl;
+
+    int n_edges = 0;
+    for (const auto& e : this->polymesh.edges()) {
+        if (this->e_manager[e]) {
+            n_edges++;
+        }
+    }
+    std::cout << "Motorcycle graph contains " << n_edges << " edges after propagation." << std::endl;
+    std::cout << std::endl;
 
     std::vector<Perimeter> perimeters = this->extract_perimeters();
-
     std::cout << "Extracted " << perimeters.size() << " perimeters." << std::endl;
+    std::cout << std::endl;
 
     this->assign_patches(perimeters);
 
@@ -74,7 +94,7 @@ bool MotorcycleGraph::is_ordinary(VertexHandle v) {
 }
 
 void MotorcycleGraph::propagate_motorcycles(Motorcycles& motorcycles) {
-
+    std::cout << "Propagating motorcycles." << std::endl;
     std::unordered_set<int> v_seen{};
 
     // go until every motorcycle has crashed
@@ -85,10 +105,9 @@ void MotorcycleGraph::propagate_motorcycles(Motorcycles& motorcycles) {
         std::unordered_map<int,  std::unordered_set<int> > positions;
         foreach (int origin, motorcycles | boost::adaptors::map_keys) {
             std::unique_ptr<Motorcycle>& motorcycle = motorcycles.at(origin);
-            HalfedgeHandle h_prev = motorcycle->curr();
-            this->e_manager[this->polymesh.edge_handle(h_prev)] = true;
-            VertexHandle v_curr = this->polymesh.to_vertex_handle(h_prev);
-            motorcycle->step();
+            HalfedgeHandle h_curr = motorcycle->step();
+            this->e_manager[this->polymesh.edge_handle(h_curr)] = true;
+            VertexHandle v_curr = this->polymesh.to_vertex_handle(h_curr);
             positions[v_curr.idx()].insert(motorcycle->origin);
         }
 
@@ -132,17 +151,20 @@ void MotorcycleGraph::propagate_motorcycles(Motorcycles& motorcycles) {
         }
 
     }
+
 }
 
 std::vector<MotorcycleGraph::Perimeter> MotorcycleGraph::extract_perimeters() {
+    std::cout << "Extracting perimeters." << std::endl;
 
-    // TODO: desc.
+    // Build the set of seeds from which to start the
+    // follow-your-nose search
     std::vector<std::pair<int, int> > seeds;
     for (const VertexHandle& v_handle : this->polymesh.vertices()) {
         if (this->v_manager[v_handle]) {
             MotorcycleConstants::MyMesh::VertexOHalfedgeCWIter iter = this->polymesh.voh_cwbegin(v_handle);
             while  (iter != this->polymesh.voh_cwend(v_handle)) {
-                bool is_boundary = this->polymesh.is_boundary(v_handle);
+                bool is_boundary = this->polymesh.is_boundary(*iter);
                 bool is_edge  = e_manager[this->polymesh.edge_handle(*iter)];
                 if (!is_boundary && is_edge) {
                     seeds.push_back(std::make_pair(v_handle.idx(), iter->idx()));
@@ -152,7 +174,8 @@ std::vector<MotorcycleGraph::Perimeter> MotorcycleGraph::extract_perimeters() {
         }
     }
 
-    // TODO: desc.
+    // Follow your nose !
+    // TODO: improve comment
     std::unordered_set<int> h_seen{};
     std::vector<Perimeter> perimeters;
     for (const std::pair<int, int>& seed : seeds) {
@@ -192,7 +215,11 @@ std::vector<MotorcycleGraph::Perimeter> MotorcycleGraph::extract_perimeters() {
 
 }
 
-void MotorcycleGraph::assign_patches(std::vector<Perimeter> &perimeters) {
+void MotorcycleGraph::assign_patches(std::vector<Perimeter> &perimeters1) {
+    std::cout << "Assigning patches." << std::endl;
+
+    std::vector<Perimeter> perimeters = MotorcycleGraph::sort_perimeters(perimeters1);
+
     size_t patch_id = 0;
     for (const Perimeter& perimeter : perimeters) {
         std::vector<int> to_explore;
@@ -211,6 +238,7 @@ void MotorcycleGraph::assign_patches(std::vector<Perimeter> &perimeters) {
                     to_explore.push_back(h);
                 }
             }
+            j++;
         }
 
         std::unordered_set<int> boundary;
@@ -228,20 +256,22 @@ void MotorcycleGraph::assign_patches(std::vector<Perimeter> &perimeters) {
         while (!queue.empty()) {
             VertexHandle v_curr = this->polymesh.vertex_handle(queue.front());
             queue.pop();
-            if (v_seen.count(v_curr.idx()) == 0 && boundary.count(v_curr.idx()) == 0) {
+            if (true) { // v_seen.count(v_curr.idx()) == 0) {// && boundary.count(v_curr.idx()) == 0) {
                 v_seen.insert(v_curr.idx());
                 MotorcycleConstants::MyMesh::VertexOHalfedgeCWIter iter = this->polymesh.voh_cwbegin(v_curr);
                 while  (iter != this->polymesh.voh_cwend(v_curr)) {
                     VertexHandle v_next = this->polymesh.to_vertex_handle(*iter);
-                    bool on_boundary = boundary.count(v_next.idx()) == 1;
+                    bool on_boundary = false; //boundary.count(v_next.idx()) == 1;
                     if (!on_boundary) {
                         FaceHandle f_handle = this->polymesh.face_handle(*iter);
-                        if (f_handle.is_valid()) {
+                        if (f_handle.is_valid() && this->f_manager[f_handle] == SIZE_T_MAX) {
                             this->f_manager[f_handle] = patch_id;
                         }
                         // TODO: this if *should* be unnecessary
                         if (v_seen.count(v_next.idx()) == 0) {
                             v_seen.insert(v_next.idx());
+                        } else {
+                            std::cout << " error";
                         }
                     }
                     ++iter;
@@ -275,5 +305,5 @@ void MotorcycleGraph::save_mesh() {
         std::cerr << "2. Mesh does not provide necessary information!\n";
         std::cerr << "3. Or simply cannot open file for writing!\n";
     } else
-        std::cout << "Ok.\n";
+        std::cout << "Mesh saved to " << fname << std::endl;
 }

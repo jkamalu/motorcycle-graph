@@ -45,6 +45,27 @@ private:
     std::vector<Perimeter> extract_perimeters();
     void assign_patches(std::vector<Perimeter>& perimeters);
 
+    std::vector<Perimeter> sort_perimeters(std::vector<Perimeter>& perimeters) {
+        std::unordered_map<int, std::vector<Perimeter> > index;
+        for (auto p : perimeters) {
+            index[p.size()].push_back(p);
+        }
+
+        std::vector<int> keys;
+        for (int i : index | boost::adaptors::map_keys) {
+            keys.push_back(i);
+        }
+        sort(keys.begin(), keys.end());
+
+        std::vector<Perimeter> sorted;
+        for (std::vector<int>::iterator iter = keys.end(); iter != keys.begin(); iter--) {
+            for (auto p : index[*iter]) {
+                sorted.push_back(p);
+            }
+        }
+        return sorted;
+    }
+
 public:
 
     MotorcycleGraph(MotorcycleConstants::MyMesh& polymesh);
